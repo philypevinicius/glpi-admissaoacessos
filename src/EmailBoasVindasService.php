@@ -65,11 +65,15 @@ class EmailBoasVindasService
             return ['ok' => false, 'motivo' => __('Nenhuma tarefa concluída bate com um sistema do catálogo.', 'admissaoacessos')];
         }
 
+        $remetente = \Config::getAdminEmailSender((int) $ticket->fields['entities_id']);
+
         return [
             'ok'           => true,
             'motivo'       => '',
+            'remetente'    => $remetente['email'],
             'assunto'      => $montagem['assunto'],
             'corpo'        => $montagem['corpo'],
+            'corpo_html'   => $montagem['corpo_html'],
             'destinatario' => $montagem['destinatario'],
         ];
     }
@@ -94,9 +98,12 @@ class EmailBoasVindasService
             return ['enviado' => false, 'motivo' => $motivo];
         }
 
-        ['destinatario' => $destinatario, 'nome' => $nome, 'assunto' => $assunto, 'corpo' => $corpo, 'sistemas_ids' => $sistemasIds] = $montagem;
+        [
+            'destinatario' => $destinatario, 'nome' => $nome, 'assunto' => $assunto,
+            'corpo' => $corpo, 'corpo_html' => $corpoHtml, 'sistemas_ids' => $sistemasIds,
+        ] = $montagem;
 
-        $enfileirou = NotificacaoService::enfileirar($ticket, $destinatario, $nome, $assunto, $corpo);
+        $enfileirou = NotificacaoService::enfileirar($ticket, $destinatario, $nome, $assunto, $corpo, $corpoHtml);
 
         $log = new RegistroEnvio();
         $log->add([
@@ -163,7 +170,7 @@ class EmailBoasVindasService
     }
 
     /**
-     * @return array{destinatario: string, assunto: string, corpo: string, sistemas_ids: int[]}|null
+     * @return array{destinatario: string, nome: string, assunto: string, corpo: string, corpo_html: string, sistemas_ids: int[]}|null
      */
     private static function montarEmail(\Ticket $ticket): ?array
     {
@@ -173,7 +180,7 @@ class EmailBoasVindasService
 
         $nome = '';
         $email = self::buscarEmail($tarefas, (int) $config->fields['tasktemplates_id_base']);
-        $linhasPorSistema = []; // ordem do catálogo (display_order)
+        $linhasPorSistema = []; // ordem do catálogo (display_order) - {nome, texto}
         $sistemasIds = [];
 
         foreach ($tarefas as $tarefa) {
@@ -195,7 +202,10 @@ class EmailBoasVindasService
                 (string) $sistema['email_text']
             );
 
-            $linhasPorSistema[(int) $sistema['display_order'] . '_' . $sistema['id']] = $sistema['name'] . ': ' . $textoSistema;
+            $linhasPorSistema[(int) $sistema['display_order'] . '_' . $sistema['id']] = [
+                'nome'  => $sistema['name'],
+                'texto' => $textoSistema,
+            ];
             $sistemasIds[] = (int) $sistema['id'];
         }
 
@@ -204,11 +214,15 @@ class EmailBoasVindasService
         }
 
         ksort($linhasPorSistema, SORT_NATURAL);
-        $listaAcessos = implode("\n", $linhasPorSistema);
+
+        $listaAcessosTexto = implode("\n", array_map(
+            static fn(array $linha): string => $linha['nome'] . ': ' . $linha['texto'],
+            $linhasPorSistema
+        ));
 
         $corpo = str_replace(
             ['{{nome}}', '{{lista_acessos}}', '{{aviso_troca_senha}}'],
-            [$nome, $listaAcessos, self::AVISO_TROCA_SENHA_PADRAO],
+            [$nome, $listaAcessosTexto, self::AVISO_TROCA_SENHA_PADRAO],
             (string) $config->fields['email_body']
         );
         $assunto = str_replace('{{nome}}', $nome, (string) $config->fields['email_subject']);
@@ -218,8 +232,42 @@ class EmailBoasVindasService
             'nome'         => $nome,
             'assunto'      => $assunto,
             'corpo'        => $corpo,
+            'corpo_html'   => self::montarCorpoHtml((string) $config->fields['email_body'], $nome, $linhasPorSistema),
             'sistemas_ids' => $sistemasIds,
         ];
+    }
+
+    /**
+     * Versão HTML do corpo - mesma mensagem de texto do coordenador, só
+     * que {{lista_acessos}} vira uma tabela de verdade (uma linha por
+     * sistema, nome em destaque), compatível com cliente de e-mail
+     * (tabela com estilo inline, sem CSS externo).
+     *
+     * @param array<string, array{nome: string, texto: string}> $linhasPorSistema
+     */
+    private static function montarCorpoHtml(string $corpoTexto, string $nome, array $linhasPorSistema): string
+    {
+        $tabela = '<table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:12px 0;">';
+        foreach ($linhasPorSistema as $linha) {
+            $tabela .=
+                '<tr>' .
+                '<td style="padding:8px 12px;border:1px solid #E2E8F0;font-weight:bold;white-space:nowrap;">' . \Html::entities_deep($linha['nome']) . '</td>' .
+                '<td style="padding:8px 12px;border:1px solid #E2E8F0;">' . \Html::entities_deep($linha['texto']) . '</td>' .
+                '</tr>';
+        }
+        $tabela .= '</table>';
+
+        $partes = explode('{{lista_acessos}}', $corpoTexto);
+        $html = '';
+        foreach ($partes as $indice => $parte) {
+            $parte = str_replace(['{{nome}}', '{{aviso_troca_senha}}'], [$nome, self::AVISO_TROCA_SENHA_PADRAO], $parte);
+            $html .= nl2br(\Html::entities_deep($parte));
+            if ($indice < count($partes) - 1) {
+                $html .= $tabela;
+            }
+        }
+
+        return $html;
     }
 
     private static function buscarEmail(array $tarefas, int $tasktemplateBase): string

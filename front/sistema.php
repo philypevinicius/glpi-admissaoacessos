@@ -31,47 +31,63 @@ echo "<a class='btn btn-primary btn-sm' href='" . $CFG_GLPI['root_doc'] . "/plug
 echo "</div>";
 echo "</div>";
 
+$termoBusca = trim($_GET['busca'] ?? '');
+
+$where = [];
+if ($termoBusca !== '') {
+    $where['name'] = ['LIKE', '%' . $termoBusca . '%'];
+}
+
+$totalGeral = countElementsInTable(Sistema::getTable());
+
 $linhas = $DB->request([
     'FROM'  => Sistema::getTable(),
+    'WHERE' => $where,
     'ORDER' => ['display_order ASC', 'name ASC'],
 ]);
 
+echo "<div class='mb-3'>";
+echo "<form method='get' class='d-flex gap-2'>";
+echo "<input type='text' name='busca' class='form-control' value='" . htmlescape($termoBusca) . "' placeholder='" . __s('Buscar sistema...', 'admissaoacessos') . "'>";
+echo Html::submit(_sx('button', 'Search'), ['class' => 'btn btn-outline-secondary']);
+echo "</form>";
+echo "</div>";
+
 if (count($linhas) === 0) {
-    echo "<div class='text-muted small'>" . __('Nenhum sistema cadastrado ainda.', 'admissaoacessos') . "</div>";
+    echo "<div class='text-muted small'>" . __('Nenhum sistema encontrado.', 'admissaoacessos') . "</div>";
 } else {
-    echo "<div class='mb-3'>";
-    echo "<input type='text' class='form-control' data-busca-tabela='aa-tabela-sistemas' placeholder='" . __s('Pesquisar...', 'admissaoacessos') . "'>";
-    echo "</div>";
-    echo "<table class='table table-striped' id='aa-tabela-sistemas'>";
-    echo "<thead><tr>";
-    echo "<th>" . __('Ordem', 'admissaoacessos') . "</th>";
-    echo "<th>" . __('Sistema', 'admissaoacessos') . "</th>";
-    echo "<th>" . __('Tipo de acesso', 'admissaoacessos') . "</th>";
-    echo "<th>" . __('Modelo de tarefa', 'admissaoacessos') . "</th>";
-    echo "<th>" . __('Ativo', 'admissaoacessos') . "</th>";
-    echo "<th></th>";
-    echo "</tr></thead><tbody>";
-
     $tipos = Sistema::getTiposAcesso();
+    $totalExibido = 0;
 
+    echo "<div class='d-flex flex-column gap-2'>";
     foreach ($linhas as $linha) {
+        $totalExibido++;
         $urlEditar = $CFG_GLPI['root_doc'] . '/plugins/admissaoacessos/front/sistema.form.php?id=' . $linha['id'];
         $urlToggle = $CFG_GLPI['root_doc'] . '/plugins/admissaoacessos/front/sistema.form.php?id=' . $linha['id'] . '&toggle=1';
 
-        $nomeModelo = $linha['tasktemplates_id']
-            ? Dropdown::getDropdownName('glpi_tasktemplates', $linha['tasktemplates_id'])
-            : "<span class='text-danger'>" . __('Nenhum', 'admissaoacessos') . "</span>";
+        $subtitulo = $tipos[$linha['access_type']] ?? $linha['access_type'];
+        if ($linha['uses_project_action']) {
+            $subtitulo .= ' · ' . __('pede Projeto e Ação', 'admissaoacessos');
+        }
 
-        echo "<tr" . ($linha['is_active'] ? "" : " class='text-muted'") . ">";
-        echo "<td>" . (int) $linha['display_order'] . "</td>";
-        echo "<td><a href='" . $urlEditar . "'>" . htmlescape($linha['name']) . "</a></td>";
-        echo "<td>" . htmlescape($tipos[$linha['access_type']] ?? $linha['access_type']) . "</td>";
-        echo "<td>" . $nomeModelo . "</td>";
-        echo "<td><a href='" . $urlToggle . "' class='badge rounded-pill " . ($linha['is_active'] ? 'text-bg-success' : 'text-bg-secondary') . "' style='text-decoration:none;'>" . ($linha['is_active'] ? __('Sim', 'admissaoacessos') : __('Não', 'admissaoacessos')) . "</a></td>";
-        echo "<td class='text-end'><a href='" . $urlEditar . "' class='btn btn-sm btn-outline-secondary'><i class='ti ti-pencil'></i></a></td>";
-        echo "</tr>";
+        echo "<div class='card mb-0'>";
+        echo "<div class='card-body d-flex align-items-center justify-content-between gap-3 py-2'>";
+        echo "<div>";
+        echo "<a href='" . $urlEditar . "' class='fw-bold text-decoration-none'>" . htmlescape($linha['name']) . "</a>";
+        echo "<div class='text-muted small'>" . htmlescape($subtitulo) . "</div>";
+        echo "</div>";
+        echo "<div class='d-flex align-items-center gap-3'>";
+        echo "<a href='" . $urlToggle . "' class='badge rounded-pill " . ($linha['is_active'] ? 'text-bg-success' : 'text-bg-secondary') . "' style='text-decoration:none;'>" . ($linha['is_active'] ? __('Ativo', 'admissaoacessos') : __('Inativo', 'admissaoacessos')) . "</a>";
+        echo "<a href='" . $urlEditar . "' class='btn btn-sm btn-outline-secondary' title='" . __s('Editar', 'admissaoacessos') . "'><i class='ti ti-pencil'></i></a>";
+        echo "</div>";
+        echo "</div>";
+        echo "</div>";
     }
-    echo "</tbody></table>";
+    echo "</div>";
+
+    echo "<div class='text-muted small mt-2'>";
+    echo sprintf(__('Mostrando %1$d de %2$d sistemas', 'admissaoacessos'), $totalExibido, $totalGeral);
+    echo "</div>";
 }
 
 echo "</div></div>";

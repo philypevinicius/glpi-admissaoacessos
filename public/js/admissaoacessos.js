@@ -45,10 +45,13 @@
                 'Nenhum sistema ativo no catálogo.</div>';
         } else {
             sistemas.forEach(function (sistema) {
+                var jaTem = !!sistema.ja_adicionado;
                 itensHtml +=
-                    '<label class="admissaoacessos-item">' +
-                        '<input type="checkbox" value="' + sistema.id + '">' +
-                        '<span>' + escaparHtml(sistema.name) + '</span>' +
+                    '<label class="admissaoacessos-item' + (jaTem ? ' admissaoacessos-item-desabilitado' : '') + '">' +
+                        '<input type="checkbox" value="' + sistema.id + '"' + (jaTem ? ' checked disabled' : '') + '>' +
+                        '<span>' + escaparHtml(sistema.name) +
+                        (jaTem ? ' <em class="admissaoacessos-ja-adicionado">(já adicionado)</em>' : '') +
+                        '</span>' +
                     '</label>';
             });
         }
@@ -61,30 +64,46 @@
                     '<button type="button" class="admissaoacessos-fechar" aria-label="Fechar">&times;</button>' +
                 '</div>' +
                 '<div class="admissaoacessos-corpo">' +
-                    '<div class="admissaoacessos-lista">' + itensHtml + '</div>' +
+                    '<div class="admissaoacessos-lista admissaoacessos-lista-duas-colunas">' + itensHtml + '</div>' +
                 '</div>' +
-                '<div class="admissaoacessos-rodape">' +
-                    '<button type="button" class="btn btn-outline-secondary admissaoacessos-cancelar">Cancelar</button>' +
-                    '<button type="button" class="btn btn-primary admissaoacessos-confirmar">Criar tarefas</button>' +
+                '<div class="admissaoacessos-rodape admissaoacessos-rodape-com-contador">' +
+                    '<span class="admissaoacessos-contador">0 sistemas selecionados</span>' +
+                    '<div class="d-flex gap-2">' +
+                        '<button type="button" class="btn btn-outline-secondary admissaoacessos-cancelar">Cancelar</button>' +
+                        '<button type="button" class="btn btn-primary admissaoacessos-confirmar" disabled>Criar tarefas</button>' +
+                    '</div>' +
                 '</div>' +
             '</div>';
 
         document.body.appendChild(modal);
 
+        var contador = modal.querySelector('.admissaoacessos-contador');
+        var botaoConfirmar = modal.querySelector('.admissaoacessos-confirmar');
+
+        function atualizarContador() {
+            var marcados = modal.querySelectorAll('.admissaoacessos-item input:checked:not(:disabled)').length;
+            contador.textContent = marcados + (marcados === 1 ? ' sistema selecionado' : ' sistemas selecionados');
+            botaoConfirmar.textContent = marcados > 0 ? ('Criar ' + marcados + (marcados === 1 ? ' tarefa' : ' tarefas')) : 'Criar tarefas';
+            botaoConfirmar.disabled = marcados === 0;
+        }
+        modal.querySelectorAll('.admissaoacessos-item input:not(:disabled)').forEach(function (campo) {
+            campo.addEventListener('change', atualizarContador);
+        });
+        atualizarContador();
+
         modal.querySelector('.admissaoacessos-backdrop').addEventListener('click', fecharModal);
         modal.querySelector('.admissaoacessos-fechar').addEventListener('click', fecharModal);
         modal.querySelector('.admissaoacessos-cancelar').addEventListener('click', fecharModal);
 
-        modal.querySelector('.admissaoacessos-confirmar').addEventListener('click', function () {
+        botaoConfirmar.addEventListener('click', function () {
             var selecionados = Array.prototype.slice
-                .call(modal.querySelectorAll('.admissaoacessos-item input:checked'))
+                .call(modal.querySelectorAll('.admissaoacessos-item input:checked:not(:disabled)'))
                 .map(function (campo) { return campo.value; });
 
             if (selecionados.length === 0) {
                 return;
             }
 
-            var botaoConfirmar = modal.querySelector('.admissaoacessos-confirmar');
             botaoConfirmar.disabled = true;
 
             var corpo = new URLSearchParams();
@@ -113,7 +132,7 @@
     function abrirModal(botao) {
         var ticketsId = botao.dataset.ticketsId;
 
-        fetch(raiz + '/plugins/admissaoacessos/ajax/listar_sistemas.php')
+        fetch(raiz + '/plugins/admissaoacessos/ajax/listar_sistemas.php?tickets_id=' + ticketsId)
             .then(function (resposta) { return resposta.json(); })
             .then(function (sistemas) {
                 criarModal(ticketsId, sistemas);
@@ -153,10 +172,16 @@
                     criarModalTexto('Ver e-mail', '<p class="admissaoacessos-vazio">' + escaparHtml(dados.motivo) + '</p>');
                     return;
                 }
+                // corpo_html já vem escapado pelo servidor (EmailBoasVindasService::
+                // montarCorpoHtml() passa todo texto dinâmico por Html::entities_deep
+                // antes de montar a tabela) - seguro inserir direto, sem escapar de novo.
                 criarModalTexto('Ver e-mail',
-                    '<p><strong>Para:</strong> ' + escaparHtml(dados.destinatario) + '</p>' +
-                    '<p><strong>Assunto:</strong> ' + escaparHtml(dados.assunto) + '</p>' +
-                    '<div class="admissaoacessos-preview-corpo">' + escaparHtml(dados.corpo).replace(/\n/g, '<br>') + '</div>'
+                    '<div class="admissaoacessos-preview-cabecalho">' +
+                        '<div><strong>De:</strong> ' + escaparHtml(dados.remetente || '') + '</div>' +
+                        '<div><strong>Para:</strong> ' + escaparHtml(dados.destinatario) + '</div>' +
+                        '<div><strong>Assunto:</strong> ' + escaparHtml(dados.assunto) + '</div>' +
+                    '</div>' +
+                    '<div class="admissaoacessos-preview-corpo">' + dados.corpo_html + '</div>'
                 );
             });
     }

@@ -147,10 +147,8 @@ echo "<div class='container-fluid' style='margin-top: 1em;'>";
 echo "<div style='max-width: 760px;'>";
 echo "<div class='card'><div class='card-body'>";
 
-echo "<div class='d-flex align-items-center gap-2 mb-3'>";
-echo "<a href='" . $urlLista . "' class='btn btn-outline-secondary btn-sm rounded-pill d-inline-flex align-items-center gap-1'><i class='ti ti-arrow-left'></i>" . __('Voltar', 'admissaoacessos') . "</a>";
-echo "<h2 class='mb-0'>" . ($id > 0 ? __('Editar sistema', 'admissaoacessos') : __('Novo sistema', 'admissaoacessos')) . "</h2>";
-echo "</div>";
+echo "<div class='text-muted small mb-1'>" . __('Acessos da admissão', 'admissaoacessos') . " &rsaquo; <a href='" . $urlLista . "'>" . __('Catálogo', 'admissaoacessos') . "</a></div>";
+echo "<h2 class='mb-3'>" . ($id > 0 ? sprintf(__('Editar sistema: %s', 'admissaoacessos'), htmlescape($item->fields['name'])) : __('Novo sistema', 'admissaoacessos')) . "</h2>";
 
 echo "<form method='post' action='" . $urlForm . "'>";
 echo Html::hidden('_glpi_csrf_token', ['value' => Session::getNewCSRFToken()]);
@@ -171,57 +169,68 @@ Dropdown::show('TaskTemplate', [
 ]);
 echo "</div>";
 
-echo "<div class='mb-3 form-check'>";
-echo "<input type='checkbox' class='form-check-input' name='_criar_atualizar_modelo' id='_criar_atualizar_modelo'>";
-echo "<label class='form-check-label' for='_criar_atualizar_modelo'>" . __('Criar/atualizar o modelo de tarefa nativo com o texto padrão', 'admissaoacessos') . "</label>";
-echo "</div>";
-
-echo "<div class='mb-3'>";
+echo "<div class='row mb-3'>";
+echo "<div class='col-7'>";
 echo "<label class='form-label'>" . __('Tipo de acesso', 'admissaoacessos') . "</label>";
 Dropdown::showFromArray('access_type', Sistema::getTiposAcesso(), [
     'value' => $item->fields['access_type'] ?? Sistema::TIPO_LIVRE,
 ]);
 echo "</div>";
+echo "<div class='col-5'>";
+echo "<label class='form-label'>" . __('Ordem no e-mail', 'admissaoacessos') . "</label>";
+echo Html::input('display_order', ['value' => $item->fields['display_order'] ?? 0, 'type' => 'number']);
+echo "</div>";
+echo "</div>";
 
 echo "<div class='mb-3'>";
-echo "<label class='form-label'>" . __('Texto exibido no e-mail', 'admissaoacessos') . "</label>";
+echo "<label class='form-label'>" . __('Texto no e-mail', 'admissaoacessos') . "</label>";
 echo "<textarea name='email_text' class='form-control' rows='3'>" . htmlescape($item->fields['email_text'] ?? '') . "</textarea>";
-echo "<div class='form-text'>" . __('Variáveis disponíveis: {{senha_padrao}}, {{nome}}, {{email}}', 'admissaoacessos') . "</div>";
+echo "<div class='form-text'>" . __('Variáveis: {{senha_padrao}}, {{nome}}, {{email}}', 'admissaoacessos') . "</div>";
+echo "</div>";
+
+echo "<div class='mb-2 form-check'>";
+echo "<input type='checkbox' class='form-check-input' name='uses_project_action' id='uses_project_action'" . (($item->fields['uses_project_action'] ?? 0) ? " checked" : "") . ">";
+echo "<label class='form-check-label' for='uses_project_action'>" . __('Pede Projeto e Ação no modelo', 'admissaoacessos') . "</label>";
+echo "</div>";
+
+echo "<div class='mb-2 form-check'>";
+echo "<input type='checkbox' class='form-check-input' name='is_active' id='is_active'" . (($id === 0 || ($item->fields['is_active'] ?? 0)) ? " checked" : "") . ">";
+echo "<label class='form-check-label' for='is_active'>" . __('Sistema ativo', 'admissaoacessos') . "</label>";
 echo "</div>";
 
 echo "<div class='mb-3 form-check'>";
-echo "<input type='checkbox' class='form-check-input' name='uses_project_action' id='uses_project_action'" . (($item->fields['uses_project_action'] ?? 0) ? " checked" : "") . ">";
-echo "<label class='form-check-label' for='uses_project_action'>" . __('Esse sistema usa os campos Projeto:/Ação: no modelo (hoje só o FOCO)', 'admissaoacessos') . "</label>";
+echo "<input type='checkbox' class='form-check-input' name='_criar_atualizar_modelo' id='_criar_atualizar_modelo'>";
+echo "<label class='form-check-label' for='_criar_atualizar_modelo'>" . __('Atualizar o modelo de tarefa com o texto padrão', 'admissaoacessos') . "</label>";
 echo "</div>";
 
-echo "<div class='mb-3'>";
-echo "<label class='form-label'>" . __('Ordem de exibição no e-mail', 'admissaoacessos') . "</label>";
-echo Html::input('display_order', ['value' => $item->fields['display_order'] ?? 0, 'type' => 'number']);
-echo "</div>";
-
-echo "<div class='row mb-3'>";
+echo "<details class='mb-3'>";
+echo "<summary class='text-muted small' style='cursor:pointer;'>" . __('Entidade e recursividade', 'admissaoacessos') . "</summary>";
+echo "<div class='row mt-2'>";
 echo "<div class='col-6'>";
-echo "<label class='form-label'>" . __('Entidade', 'admissaoacessos') . "</label>";
 Dropdown::show('Entity', ['name' => 'entities_id', 'value' => $item->fields['entities_id'] ?? 0]);
 echo "</div>";
-echo "<div class='col-6 d-flex align-items-end'>";
+echo "<div class='col-6 d-flex align-items-center'>";
 echo "<div class='form-check'>";
 echo "<input type='checkbox' class='form-check-input' name='is_recursive' id='is_recursive'" . (($item->fields['is_recursive'] ?? 0) ? " checked" : "") . ">";
 echo "<label class='form-check-label' for='is_recursive'>" . __('Recursivo (sub-entidades)', 'admissaoacessos') . "</label>";
 echo "</div>";
 echo "</div>";
 echo "</div>";
+echo "</details>";
 
-echo "<div class='mb-3 form-check'>";
-echo "<input type='checkbox' class='form-check-input' name='is_active' id='is_active'" . (($id === 0 || ($item->fields['is_active'] ?? 0)) ? " checked" : "") . ">";
-echo "<label class='form-check-label' for='is_active'>" . __('Ativo', 'admissaoacessos') . "</label>";
-echo "</div>";
-
-echo "<div class='d-flex gap-2'>";
-echo Html::submit($id > 0 ? __('Salvar', 'admissaoacessos') : __('Adicionar', 'admissaoacessos'), ['name' => $id > 0 ? 'update' : 'add', 'class' => 'btn btn-primary']);
-if ($id > 0) {
+echo "<hr>";
+echo "<div class='d-flex justify-content-between'>";
+if ($id > 0 && $item->podeExcluir()) {
     echo "<a class='btn btn-outline-danger' href='?id=" . $id . "&delete=1' onclick=\"return confirm('" . __s('Excluir este sistema?', 'admissaoacessos') . "');\">" . __('Excluir', 'admissaoacessos') . "</a>";
+} elseif ($id > 0) {
+    echo "<span class='text-muted small align-self-center'>" . __('Já usado em algum envio - só é possível desativar.', 'admissaoacessos') . "</span>";
+} else {
+    echo "<span></span>";
 }
+echo "<div class='d-flex gap-2'>";
+echo "<a class='btn btn-outline-secondary' href='" . $urlLista . "'>" . __('Cancelar', 'admissaoacessos') . "</a>";
+echo Html::submit(__('Salvar', 'admissaoacessos'), ['name' => $id > 0 ? 'update' : 'add', 'class' => 'btn btn-primary']);
+echo "</div>";
 echo "</div>";
 
 echo "</form>";

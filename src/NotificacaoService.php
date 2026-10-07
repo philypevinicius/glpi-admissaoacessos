@@ -18,7 +18,7 @@ class NotificacaoService
 {
     private const EVENTO = 'plugin_admissaoacessos_boasvindas';
 
-    public static function enfileirar(\Ticket $ticket, string $destinatarioEmail, string $destinatarioNome, string $assunto, string $corpo): bool
+    public static function enfileirar(\Ticket $ticket, string $destinatarioEmail, string $destinatarioNome, string $assunto, string $corpo, string $corpoHtml = ''): bool
     {
         global $CFG_GLPI;
 
@@ -44,6 +44,7 @@ class NotificacaoService
             'toname'                    => $destinatarioNome !== '' ? $destinatarioNome : $destinatarioEmail,
             'subject'                   => $assunto,
             'content_text'              => $corpo,
+            'content_html'              => $corpoHtml !== '' ? $corpoHtml : null,
             'event'                     => self::EVENTO,
             'itemtype_trigger'          => 'Ticket',
             'items_id_trigger'          => $ticket->getID(),

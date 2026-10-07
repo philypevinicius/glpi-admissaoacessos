@@ -1,0 +1,14 @@
+{
+    "name": "sebrae/admissaoacessos",
+    "description": "Acessos da admissão - organiza a liberação de acessos de sistemas no processo de admissão do GLPI.",
+    "type": "glpi-plugin",
+    "license": "GPL-3.0-or-later",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "GlpiPlugin\\Admissaoacessos\\": "src/"
+        }
+    }
+}
