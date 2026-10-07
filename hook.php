@@ -271,14 +271,48 @@ function plugin_admissaoacessos_timeline_actions(array $params): void
     echo "<i class='ti ti-user-plus' aria-hidden='true'></i> " . __('Adicionar tarefas de acesso', 'admissaoacessos');
     echo "</button>";
     echo "</li>";
+
+    // "Ver e-mail" (pré-visualização) e "Reenviar" - só pra quem tem o
+    // direito de configuração (Coordenador+), não pro técnico comum.
+    if (\GlpiPlugin\Admissaoacessos\AccessService::canAccess()) {
+        echo "<li>";
+        echo "<button type='button' class='btn btn-outline-secondary admissaoacessos-ver-email' "
+            . "data-tickets-id='" . (int) $item->getID() . "'>";
+        echo "<i class='ti ti-mail' aria-hidden='true'></i> " . __('Ver e-mail', 'admissaoacessos');
+        echo "</button>";
+        echo "</li>";
+
+        echo "<li>";
+        echo "<button type='button' class='btn btn-outline-secondary admissaoacessos-reenviar-email' "
+            . "data-tickets-id='" . (int) $item->getID() . "'>";
+        echo "<i class='ti ti-send' aria-hidden='true'></i> " . __('Reenviar e-mail de acessos', 'admissaoacessos');
+        echo "</button>";
+        echo "</li>";
+    }
 }
 
 /**
- * Fecha o chamado -> dispara o e-mail de boas-vindas (Fase 5, ainda não
- * implementada). Por enquanto só um stub seguro, pra não quebrar a
- * ativação do plugin.
+ * Fase 4 (conversão de tarefa em chamado) não precisou de nenhum código:
+ * o "Promote to Ticket" nativo do GLPI (botão que já aparece sozinho na
+ * timeline de qualquer TicketTask, ver CommonITILObject::getTimelineItems())
+ * funciona automaticamente pras tarefas que este plugin cria - a condição
+ * nativa (`Session::getCurrentInterface() === 'central' && $this instanceof
+ * Ticket && Ticket::canCreate()`) não depende de como a tarefa foi criada,
+ * então não há nada a reaproveitar/expor aqui.
+ *
+ * Fecha o chamado -> dispara o e-mail de boas-vindas. `updates`/
+ * `oldvalues` já vêm prontos do core (CommonDBTM::update()) com só os
+ * campos que realmente mudaram - sem precisar comparar manualmente
+ * status antigo x novo.
  */
 function plugin_admissaoacessos_item_update_ticket(\Ticket $item): void
 {
-    // TODO Fase 5
+    if (
+        !in_array('status', $item->updates, true)
+        || (int) $item->fields['status'] !== \Ticket::CLOSED
+    ) {
+        return;
+    }
+
+    \GlpiPlugin\Admissaoacessos\EmailBoasVindasService::processarFechamento($item);
 }

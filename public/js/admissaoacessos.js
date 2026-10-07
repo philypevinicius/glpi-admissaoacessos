@@ -120,10 +120,88 @@
             });
     }
 
+    /** Modal simples de texto - reusado tanto pra "Ver e-mail" quanto
+     *  pro resultado de "Reenviar". */
+    function criarModalTexto(titulo, corpoHtml) {
+        fecharModal();
+
+        var modal = document.createElement('div');
+        modal.id = 'admissaoacessos-modal';
+        modal.className = 'admissaoacessos-modal';
+        modal.innerHTML =
+            '<div class="admissaoacessos-backdrop"></div>' +
+            '<div class="admissaoacessos-caixa">' +
+                '<div class="admissaoacessos-cabecalho">' +
+                    '<strong>' + escaparHtml(titulo) + '</strong>' +
+                    '<button type="button" class="admissaoacessos-fechar" aria-label="Fechar">&times;</button>' +
+                '</div>' +
+                '<div class="admissaoacessos-corpo">' + corpoHtml + '</div>' +
+            '</div>';
+
+        document.body.appendChild(modal);
+        modal.querySelector('.admissaoacessos-backdrop').addEventListener('click', fecharModal);
+        modal.querySelector('.admissaoacessos-fechar').addEventListener('click', fecharModal);
+    }
+
+    function abrirPreviaEmail(botao) {
+        var ticketsId = botao.dataset.ticketsId;
+
+        fetch(raiz + '/plugins/admissaoacessos/ajax/previsualizar_email.php?tickets_id=' + ticketsId)
+            .then(function (resposta) { return resposta.json(); })
+            .then(function (dados) {
+                if (!dados.ok) {
+                    criarModalTexto('Ver e-mail', '<p class="admissaoacessos-vazio">' + escaparHtml(dados.motivo) + '</p>');
+                    return;
+                }
+                criarModalTexto('Ver e-mail',
+                    '<p><strong>Para:</strong> ' + escaparHtml(dados.destinatario) + '</p>' +
+                    '<p><strong>Assunto:</strong> ' + escaparHtml(dados.assunto) + '</p>' +
+                    '<div class="admissaoacessos-preview-corpo">' + escaparHtml(dados.corpo).replace(/\n/g, '<br>') + '</div>'
+                );
+            });
+    }
+
+    function reenviarEmail(botao) {
+        var ticketsId = botao.dataset.ticketsId;
+        if (!window.confirm('Reenviar o e-mail de acessos deste chamado?')) {
+            return;
+        }
+
+        var corpo = new URLSearchParams();
+        corpo.set('tickets_id', ticketsId);
+        corpo.set('_glpi_csrf_token', tokenCsrf());
+
+        fetch(raiz + '/plugins/admissaoacessos/ajax/reenviar_email.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: corpo.toString(),
+        })
+            .then(function (resposta) { return resposta.json(); })
+            .then(function (dados) {
+                criarModalTexto('Reenviar e-mail de acessos',
+                    '<p>' + (dados.enviado
+                        ? 'E-mail reenviado.'
+                        : 'Não foi possível reenviar: ' + escaparHtml(dados.motivo)) + '</p>'
+                );
+            });
+    }
+
     document.addEventListener('click', function (evento) {
-        var botao = evento.target.closest('.admissaoacessos-abrir-modal');
-        if (botao) {
-            abrirModal(botao);
+        var botaoTarefas = evento.target.closest('.admissaoacessos-abrir-modal');
+        if (botaoTarefas) {
+            abrirModal(botaoTarefas);
+            return;
+        }
+
+        var botaoVerEmail = evento.target.closest('.admissaoacessos-ver-email');
+        if (botaoVerEmail) {
+            abrirPreviaEmail(botaoVerEmail);
+            return;
+        }
+
+        var botaoReenviar = evento.target.closest('.admissaoacessos-reenviar-email');
+        if (botaoReenviar) {
+            reenviarEmail(botaoReenviar);
         }
     });
 
