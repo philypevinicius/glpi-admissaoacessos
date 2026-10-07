@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1
+
+- Corrige `EmailBoasVindasService::tarefasDoChamado()`: a query filtrava
+  por `is_deleted`, mas `glpi_tickettasks` não tem essa coluna (diferente
+  de `glpi_tickets`) - achado ao fechar um chamado de verdade.
+- Testes standalone (`tests/*.php`) para a extração de Nome:/E-mail: e
+  pra ordenação por catálogo/formato do log anti-duplicidade.
+
 ## 0.2.0
 
 - Botão "Adicionar tarefas de acesso" na timeline do chamado (hook

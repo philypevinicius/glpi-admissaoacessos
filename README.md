@@ -53,6 +53,27 @@ Em **Configurar > Acessos da admissão**:
    etc, no formato que o processo usa).
 4. Salve.
 
+## Testes
+
+Este ambiente GLPI não tem PHPUnit/PHPStan instalados (é a imagem Docker
+oficial, sem as dependências de desenvolvimento) - os testes aqui são
+scripts PHP standalone, mesmo padrão já usado em
+`plugins/dashglpi/tests/filtro_logica_test.php`:
+
+```
+php tests/extracao_campo_test.php
+php tests/montagem_lista_test.php
+```
+
+O primeiro carrega a classe REAL `ExtracaoCampoService` (não depende de
+`$DB`/GLPI, então dá pra testar direto) - inclui o caso de segurança mais
+importante: confirmar que `CPF:` nunca é extraído. O segundo reimplementa
+isoladamente o formato do log anti-duplicidade e a ordenação por catálogo
+(as duas peças que vivem dentro de classes que dependem de `$DB`/GLPI pra
+carregar). Todo o resto do plugin foi verificado ao vivo neste ambiente
+(ver commits) - sem suíte de testes com bootstrap completo do GLPI
+disponível aqui, essa é a cobertura automatizada possível.
+
 ## Solução de problemas
 
 - **O botão "Adicionar tarefas de acesso" não aparece no chamado** -
