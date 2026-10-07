@@ -14,7 +14,9 @@ if (!class_exists(Session::class)) {
     require_once __DIR__ . '/../../../inc/includes.php';
 }
 
+use GlpiPlugin\Admissaoacessos\CatalogoService;
 use GlpiPlugin\Admissaoacessos\Config;
+use GlpiPlugin\Admissaoacessos\ExtracaoCampoService;
 use GlpiPlugin\Admissaoacessos\Sistema;
 
 global $DB;
@@ -54,6 +56,29 @@ if (!$ticket->canAddItem('TicketTask')) {
     exit;
 }
 
+// Nome/E-mail "que o GLPI já sabe" pra pré-preencher as tarefas novas -
+// pega da tarefa mais ANTIGA do chamado que já tiver essas linhas
+// preenchidas (normalmente a do AD, criada/preenchida primeiro). Nunca
+// olha CPF nem qualquer outro campo.
+$nomeConhecido = '';
+$emailConhecido = '';
+foreach ($DB->request([
+    'SELECT' => ['content'],
+    'FROM'   => TicketTask::getTable(),
+    'WHERE'  => ['tickets_id' => $ticketsId],
+    'ORDER'  => ['date_creation ASC', 'id ASC'],
+]) as $tarefaExistente) {
+    if ($nomeConhecido === '') {
+        $nomeConhecido = ExtracaoCampoService::nome((string) $tarefaExistente['content']);
+    }
+    if ($emailConhecido === '') {
+        $emailConhecido = ExtracaoCampoService::email((string) $tarefaExistente['content']);
+    }
+    if ($nomeConhecido !== '' && $emailConhecido !== '') {
+        break;
+    }
+}
+
 $criadas = 0;
 $jaExistiam = 0;
 $falhas = [];
@@ -87,6 +112,17 @@ foreach ($sistemasIds as $sistemaId) {
 
     if ($novoId) {
         $criadas++;
+
+        if ($nomeConhecido !== '' || $emailConhecido !== '') {
+            $conteudoPreenchido = CatalogoService::preencherCamposConhecidos(
+                (string) $task->fields['content'],
+                $nomeConhecido,
+                $emailConhecido
+            );
+            if ($conteudoPreenchido !== $task->fields['content']) {
+                $task->update(['id' => $novoId, 'content' => $conteudoPreenchido]);
+            }
+        }
     } else {
         $falhas[] = $sistemaId;
     }

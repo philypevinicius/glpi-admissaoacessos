@@ -78,4 +78,33 @@ class CatalogoService
         $novoId = $template->add($input);
         return $novoId ? (int) $novoId : 0;
     }
+
+    /**
+     * Pré-preenche `Nome:`/`E-mail:` no conteúdo de uma tarefa recém-criada
+     * com o que o GLPI "já sabe" (geralmente copiado de outra tarefa do
+     * mesmo chamado já preenchida, ex.: a do AD) - só entra se a linha
+     * ainda estiver vazia, NUNCA sobrescreve texto que o coordenador já
+     * escreveu (regra explícita do processo). Nunca mexe em CPF nem
+     * qualquer outro campo.
+     */
+    public static function preencherCamposConhecidos(string $conteudoHtml, string $nome, string $email): string
+    {
+        if ($nome !== '' && ExtracaoCampoService::nome($conteudoHtml) === '') {
+            $conteudoHtml = str_ireplace(
+                __('Nome:', 'admissaoacessos') . '<br',
+                __('Nome:', 'admissaoacessos') . ' ' . \Html::entities_deep($nome) . '<br',
+                $conteudoHtml
+            );
+        }
+
+        if ($email !== '' && ExtracaoCampoService::email($conteudoHtml) === '') {
+            $conteudoHtml = str_ireplace(
+                __('E-mail:', 'admissaoacessos') . '<br',
+                __('E-mail:', 'admissaoacessos') . ' ' . \Html::entities_deep($email) . '<br',
+                $conteudoHtml
+            );
+        }
+
+        return $conteudoHtml;
+    }
 }
