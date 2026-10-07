@@ -74,6 +74,21 @@ carregar). Todo o resto do plugin foi verificado ao vivo neste ambiente
 (ver commits) - sem suíte de testes com bootstrap completo do GLPI
 disponível aqui, essa é a cobertura automatizada possível.
 
+## Compatibilidade com o glpipulseui
+
+Os dois plugins rodam ativos juntos neste ambiente (GLPI 11.0.8) desde
+que o `admissaoacessos` foi construído, sem nenhum conflito observado.
+Checagem formal, comparando `setup.php`/`hook.php`/`src/` dos dois:
+
+| Item | Resultado |
+|---|---|
+| Tabelas de banco | Sem colisão - glpipulseui não cria tabela própria |
+| Direito de perfil (ProfileRight) | Sem colisão - nomes distintos |
+| Hooks ($PLUGIN_HOOKS) | Sem colisão - `item_update[Ticket]` e `timeline_actions` são exclusivos do admissaoacessos |
+| Namespace/classes PHP | Sem colisão - `GlpiPlugin\Admissaoacessos\*` vs `GlpiPlugin\Glpipulseui\*` |
+| Menu (redefine_menus) | Sem colisão - chaves diferentes no array `$menus` |
+| Assets JS/CSS | Sem colisão de nome/ID/classe (só herda visualmente a classe nativa `.btn-outline-secondary`, que o tema do glpipulseui retematiza - efeito cosmético esperado, não é bug) |
+
 ## Solução de problemas
 
 - **O botão "Adicionar tarefas de acesso" não aparece no chamado** -
