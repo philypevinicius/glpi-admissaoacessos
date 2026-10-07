@@ -9,10 +9,11 @@ use GlpiPlugin\Admissaoacessos\Sistema;
 
 /**
  * Seed inicial do catálogo (ver especificação do processo) - 13 sistemas,
- * na ordem de exibição do e-mail. Cada um já ganha seu \TaskTemplate
- * nativo criado com o corpo padrão, pra não exigir nenhum passo manual
- * antes do coordenador conseguir usar o botão "Adicionar tarefas de
- * acesso" no chamado.
+ * na ordem de exibição do e-mail, mais o AD (ver
+ * plugin_admissaoacessos_garantir_sistema_ad()). Cada um já ganha seu
+ * \TaskTemplate nativo criado com o corpo padrão, pra não exigir nenhum
+ * passo manual antes do coordenador conseguir usar o botão "Adicionar
+ * tarefas de acesso" no chamado.
  *
  * @return array<int, array{name: string, access_type: string, email_text: string, uses_project_action: bool}>
  */
@@ -35,6 +36,62 @@ function plugin_admissaoacessos_catalogo_seed(): array
         ['name' => 'RM',                    'access_type' => Sistema::TIPO_LIVRE,          'email_text' => __('Acesso liberado, entre em contato.', 'admissaoacessos'), 'uses_project_action' => false],
         ['name' => 'FOCO',                  'access_type' => Sistema::TIPO_LIVRE,          'email_text' => __('Acesso liberado por link do Nacional.', 'admissaoacessos'), 'uses_project_action' => true],
     ];
+}
+
+/**
+ * O "AD" (cria login de rede e e-mail corporativo) é a tarefa BASE do
+ * processo - a primeira a ser preenchida/concluída, de onde o Nome:/
+ * E-mail: são copiados pras demais tarefas (ver CatalogoService::
+ * preencherCamposConhecidos()) e cuja conclusão é exigida antes do envio
+ * do e-mail (ver EmailBoasVindasService). NÃO está nos 13 sistemas da
+ * especificação porque não é um "acesso liberado" como os outros - por
+ * isso fica de fora da lista de linhas do e-mail (EmailBoasVindasService
+ * pula o sistema cujo tasktemplates_id bate com a tarefa base
+ * configurada), mas precisa existir no catálogo pra aparecer no botão
+ * "Adicionar tarefas de acesso" como qualquer outro sistema.
+ *
+ * Idempotente por nome - roda em toda instalação/atualização, não só na
+ * criação original da tabela, pra instalações já existentes também
+ * ganharem o AD. Se a Configuração ainda não tiver uma tarefa base
+ * escolhida, já deixa o AD marcado como tal (sem sobrescrever uma
+ * escolha que o coordenador já tenha feito).
+ */
+function plugin_admissaoacessos_garantir_sistema_ad(): void
+{
+    global $DB;
+
+    $existe = (bool) $DB->request([
+        'FROM'  => 'glpi_plugin_admissaoacessos_systems',
+        'WHERE' => ['name' => 'AD'],
+        'LIMIT' => 1,
+    ])->current();
+
+    if (!$existe) {
+        $tasktemplatesId = CatalogoService::criarOuAtualizarModelo(0, 'AD', false, 0, true);
+
+        $menorOrdem = $DB->request([
+            'SELECT' => [new \Glpi\DBAL\QueryExpression('MIN(`display_order`) AS `menor`')],
+            'FROM'   => 'glpi_plugin_admissaoacessos_systems',
+        ])->current()['menor'] ?? 1;
+
+        $DB->insert('glpi_plugin_admissaoacessos_systems', [
+            'name'              => 'AD',
+            'tasktemplates_id'  => $tasktemplatesId,
+            'access_type'       => Sistema::TIPO_LIVRE,
+            'email_text'        => '',
+            'display_order'     => max(0, ((int) $menorOrdem) - 1),
+            'uses_project_action' => 0,
+            'is_active'         => 1,
+            'entities_id'       => 0,
+            'is_recursive'      => 1,
+            'date_creation'     => $_SESSION['glpi_currenttime'] ?? date('Y-m-d H:i:s'),
+        ]);
+
+        $config = \GlpiPlugin\Admissaoacessos\Config::getConfig();
+        if ((int) ($config->fields['tasktemplates_id_base'] ?? 0) <= 0) {
+            $config->update(['id' => 1, 'tasktemplates_id_base' => $tasktemplatesId]);
+        }
+    }
 }
 
 function plugin_admissaoacessos_install()
@@ -148,6 +205,12 @@ function plugin_admissaoacessos_install()
             $ordem++;
         }
     }
+
+    // Garante o sistema "AD" - fora do loop acima de propósito: roda em
+    // TODA instalação/atualização (não só na criação original da tabela),
+    // pra quem já tinha o plugin instalado antes dele existir também
+    // ganhar o AD sem precisar reinstalar do zero.
+    plugin_admissaoacessos_garantir_sistema_ad();
 
     // Direito guardado por existência prévia - addProfileRights() não é
     // idempotente (mesmo padrão já corrigido no controleinterno/assistente).

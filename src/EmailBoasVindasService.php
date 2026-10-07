@@ -179,7 +179,8 @@ class EmailBoasVindasService
         $sistemasPorTemplate = self::sistemasAtivosPorTemplate();
 
         $nome = '';
-        $email = self::buscarEmail($tarefas, (int) $config->fields['tasktemplates_id_base']);
+        $tasktemplateBase = (int) $config->fields['tasktemplates_id_base'];
+        $email = self::buscarEmail($tarefas, $tasktemplateBase);
         $linhasPorSistema = []; // ordem do catálogo (display_order) - {nome, texto}
         $sistemasIds = [];
 
@@ -189,6 +190,14 @@ class EmailBoasVindasService
                 if ($candidatoNome !== '') {
                     $nome = $candidatoNome;
                 }
+            }
+
+            // A tarefa BASE (AD) nunca vira linha no e-mail - ela não é um
+            // "acesso liberado" como os outros, é o pré-requisito (login de
+            // rede/e-mail corporativo) de onde Nome:/E-mail: são copiados
+            // pras demais tarefas.
+            if ($tasktemplateBase > 0 && (int) $tarefa['tasktemplates_id'] === $tasktemplateBase) {
+                continue;
             }
 
             $sistema = $sistemasPorTemplate[(int) $tarefa['tasktemplates_id']] ?? null;
