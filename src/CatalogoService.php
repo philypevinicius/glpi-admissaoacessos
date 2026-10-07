@@ -11,15 +11,16 @@ namespace GlpiPlugin\Admissaoacessos;
 class CatalogoService
 {
     /**
-     * Corpo padrão da tarefa (ver especificação do processo) - texto puro
-     * com quebras de linha reais; convertido pra HTML só na hora de
-     * gravar no TaskTemplate (TinyMCE espera HTML).
+     * Rótulos padrão de toda tarefa (sem os dois condicionais de
+     * Projeto:/Ação:, só no FOCO) - lista única reusada tanto pra montar
+     * o corpo quanto pra saber quais campos tentar copiar entre tarefas
+     * (ver preencherCamposConhecidos()).
+     *
+     * @return string[]
      */
-    public static function montarCorpoPadrao(string $nomeSistema, bool $usaProjetoAcao): string
+    public static function rotulosPadrao(): array
     {
-        $linhas = [
-            sprintf(__('Favor liberar acesso no %s para o(a) usuário(a) abaixo:', 'admissaoacessos'), $nomeSistema),
-            '',
+        return [
             __('Nome:', 'admissaoacessos'),
             __('CPF:', 'admissaoacessos'),
             __('Matrícula:', 'admissaoacessos'),
@@ -32,6 +33,19 @@ class CatalogoService
             __('Empresa:', 'admissaoacessos'),
             __('Perfil a ser clonado:', 'admissaoacessos'),
         ];
+    }
+
+    /**
+     * Corpo padrão da tarefa (ver especificação do processo) - texto puro
+     * com quebras de linha reais; convertido pra HTML só na hora de
+     * gravar no TaskTemplate (TinyMCE espera HTML).
+     */
+    public static function montarCorpoPadrao(string $nomeSistema, bool $usaProjetoAcao): string
+    {
+        $linhas = array_merge(
+            [sprintf(__('Favor liberar acesso no %s para o(a) usuário(a) abaixo:', 'admissaoacessos'), $nomeSistema), ''],
+            self::rotulosPadrao()
+        );
 
         if ($usaProjetoAcao) {
             $linhas[] = __('Projeto:', 'admissaoacessos');
@@ -80,27 +94,25 @@ class CatalogoService
     }
 
     /**
-     * Pré-preenche `Nome:`/`E-mail:` no conteúdo de uma tarefa recém-criada
-     * com o que o GLPI "já sabe" (geralmente copiado de outra tarefa do
-     * mesmo chamado já preenchida, ex.: a do AD) - só entra se a linha
-     * ainda estiver vazia, NUNCA sobrescreve texto que o coordenador já
-     * escreveu (regra explícita do processo). Nunca mexe em CPF nem
-     * qualquer outro campo.
+     * Pré-preenche no conteúdo de uma tarefa recém-criada todos os campos
+     * que o GLPI "já sabe" (copiados de outra tarefa do mesmo chamado já
+     * preenchida, normalmente a do AD) - inclui CPF/Matrícula/etc, a
+     * pedido explícito do usuário (diferente do e-mail de boas-vindas,
+     * que continua restrito a Nome/E-mail - ver ExtracaoCampoService).
+     * Só entra campo por campo se a linha ainda estiver vazia, NUNCA
+     * sobrescreve texto que o coordenador já escreveu.
+     *
+     * @param array<string, string> $camposConhecidos rótulo (ex.: "Nome:") => valor
      */
-    public static function preencherCamposConhecidos(string $conteudoHtml, string $nome, string $email): string
+    public static function preencherCamposConhecidos(string $conteudoHtml, array $camposConhecidos): string
     {
-        if ($nome !== '' && ExtracaoCampoService::nome($conteudoHtml) === '') {
+        foreach ($camposConhecidos as $rotulo => $valor) {
+            if ($valor === '' || ExtracaoCampoService::valor($conteudoHtml, rtrim($rotulo, ':')) !== '') {
+                continue;
+            }
             $conteudoHtml = str_ireplace(
-                __('Nome:', 'admissaoacessos') . '<br',
-                __('Nome:', 'admissaoacessos') . ' ' . \Html::entities_deep($nome) . '<br',
-                $conteudoHtml
-            );
-        }
-
-        if ($email !== '' && ExtracaoCampoService::email($conteudoHtml) === '') {
-            $conteudoHtml = str_ireplace(
-                __('E-mail:', 'admissaoacessos') . '<br',
-                __('E-mail:', 'admissaoacessos') . ' ' . \Html::entities_deep($email) . '<br',
+                $rotulo . '<br',
+                $rotulo . ' ' . \Html::entities_deep($valor) . '<br',
                 $conteudoHtml
             );
         }

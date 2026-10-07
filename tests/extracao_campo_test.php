@@ -1,15 +1,17 @@
 <?php
 
 /**
- * Teste standalone (sem GLPI) da extração de Nome:/E-mail: do conteúdo
- * de uma tarefa - este é o ÚNICO pedaço de lógica do plugin sem nenhuma
+ * Teste standalone (sem GLPI) da extração de campos do conteúdo de uma
+ * tarefa - este é o ÚNICO pedaço de lógica do plugin sem nenhuma
  * dependência de $DB/Session/classes nativas, então carrega e testa a
  * classe REAL (não uma reimplementação) - mesmo padrão de
  * plugins/dashglpi/tests/filtro_logica_test.php.
  *
- * O caso mais importante aqui é de segurança: confirmar que CPF: nunca
- * é lido, mesmo que esteja bem ao lado de Nome:/E-mail: no mesmo texto -
- * é exatamente a garantia que o processo exige (ver README/spec).
+ * Dois escopos bem diferentes (ver docblock de ExtracaoCampoService):
+ *  - nome()/email(): usados pro e-mail de boas-vindas - NUNCA leem CPF.
+ *  - valor()/todos(): usados pra copiar campos entre tarefas do mesmo
+ *    chamado - leem QUALQUER rótulo, incluindo CPF, a pedido explícito
+ *    do usuário (confirmado por ele, entendendo a implicação de LGPD).
  *
  * Uso:
  *   php tests/extracao_campo_test.php
@@ -74,16 +76,30 @@ verificar('le o E-mail: do meio do conteudo', function () use ($conteudoCompleto
     igual('joao.silva@empresa.com', ExtracaoCampoService::email($conteudoCompleto));
 });
 
-verificar('NUNCA extrai o CPF - a classe so tem nome()/email(), sem metodo pra CPF', function () {
-    igual(false, method_exists(ExtracaoCampoService::class, 'cpf'));
-});
-
-verificar('CPF: fica no texto mas nao contamina nome() nem email()', function () use ($conteudoCompleto) {
+verificar('nome()/email() (usados no e-mail de boas-vindas) NUNCA trazem CPF', function () use ($conteudoCompleto) {
     $nome = ExtracaoCampoService::nome($conteudoCompleto);
     $email = ExtracaoCampoService::email($conteudoCompleto);
     if (str_contains($nome, '123.456.789-00') || str_contains($email, '123.456.789-00')) {
         throw new RuntimeException('CPF vazou para nome()/email()');
     }
+});
+
+verificar('valor() le CPF explicitamente quando pedido (copia entre tarefas, nao vai no e-mail)', function () use ($conteudoCompleto) {
+    igual('123.456.789-00', ExtracaoCampoService::valor($conteudoCompleto, 'CPF'));
+});
+
+verificar('todos() le varios rotulos de uma vez, incluindo CPF', function () use ($conteudoCompleto) {
+    $campos = ExtracaoCampoService::todos($conteudoCompleto, ['Nome:', 'CPF:', 'Matrícula:', 'Telefone:']);
+    igual('João da Silva', $campos['Nome:']);
+    igual('123.456.789-00', $campos['CPF:']);
+    igual('00123', $campos['Matrícula:']);
+    igual('(11) 99999-0000', $campos['Telefone:']);
+});
+
+verificar('todos() so inclui no resultado os rotulos com valor preenchido', function () use ($conteudoCompleto) {
+    $campos = ExtracaoCampoService::todos($conteudoCompleto, ['Empresa:', 'Unidade:']);
+    igual(false, array_key_exists('Empresa:', $campos), 'Empresa: vazio no conteudo de teste');
+    igual('UTIC', $campos['Unidade:']);
 });
 
 verificar('campo nao preenchido (so o rotulo) devolve string vazia', function () {

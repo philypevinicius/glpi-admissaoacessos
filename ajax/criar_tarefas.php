@@ -56,27 +56,26 @@ if (!$ticket->canAddItem('TicketTask')) {
     exit;
 }
 
-// Nome/E-mail "que o GLPI já sabe" pra pré-preencher as tarefas novas -
-// pega da tarefa mais ANTIGA do chamado que já tiver essas linhas
-// preenchidas (normalmente a do AD, criada/preenchida primeiro). Nunca
-// olha CPF nem qualquer outro campo.
-$nomeConhecido = '';
-$emailConhecido = '';
+// Todos os campos padrão (Nome, CPF, Matrícula, Cargo, Telefone, E-mail,
+// datas, Unidade, Empresa, Perfil a clonar) "que o GLPI já sabe" pra
+// pré-preencher as tarefas novas - pega da tarefa mais ANTIGA do chamado
+// que já tiver cada linha preenchida (normalmente a do AD, preenchida
+// primeiro). Inclui CPF a pedido explícito do usuário - diferente do
+// e-mail de boas-vindas (EmailBoasVindasService), que continua restrito
+// a Nome/E-mail.
+$rotulosPadrao = CatalogoService::rotulosPadrao();
+$camposConhecidos = [];
 foreach ($DB->request([
     'SELECT' => ['content'],
     'FROM'   => TicketTask::getTable(),
     'WHERE'  => ['tickets_id' => $ticketsId],
     'ORDER'  => ['date_creation ASC', 'id ASC'],
 ]) as $tarefaExistente) {
-    if ($nomeConhecido === '') {
-        $nomeConhecido = ExtracaoCampoService::nome((string) $tarefaExistente['content']);
-    }
-    if ($emailConhecido === '') {
-        $emailConhecido = ExtracaoCampoService::email((string) $tarefaExistente['content']);
-    }
-    if ($nomeConhecido !== '' && $emailConhecido !== '') {
+    $faltando = array_diff($rotulosPadrao, array_keys($camposConhecidos));
+    if (empty($faltando)) {
         break;
     }
+    $camposConhecidos += ExtracaoCampoService::todos((string) $tarefaExistente['content'], $faltando);
 }
 
 $criadas = 0;
@@ -113,11 +112,10 @@ foreach ($sistemasIds as $sistemaId) {
     if ($novoId) {
         $criadas++;
 
-        if ($nomeConhecido !== '' || $emailConhecido !== '') {
+        if (!empty($camposConhecidos)) {
             $conteudoPreenchido = CatalogoService::preencherCamposConhecidos(
                 (string) $task->fields['content'],
-                $nomeConhecido,
-                $emailConhecido
+                $camposConhecidos
             );
             if ($conteudoPreenchido !== $task->fields['content']) {
                 $task->update(['id' => $novoId, 'content' => $conteudoPreenchido]);
