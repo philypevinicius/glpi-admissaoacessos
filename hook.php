@@ -239,9 +239,44 @@ function plugin_admissaoacessos_redefine_menus($menus)
 }
 
 /**
- * Fase 5 (ainda não implementada): detectar fechamento do chamado de
- * admissão e disparar o e-mail de boas-vindas. Por enquanto só um stub
- * seguro, pra não quebrar a ativação do plugin.
+ * Botão "Adicionar tarefas de acesso" na timeline do chamado - só
+ * aparece em chamados de uma categoria configurada E pra quem tem
+ * direito nativo de criar tarefa nesse chamado (nada de reinventar
+ * permissão: usa Ticket::canAddItem(), igual o resto do GLPI).
+ * O botão só abre o modal (JS) - quem realmente cria as tarefas é
+ * ajax/criar_tarefas.php, que confere tudo de novo no servidor.
+ */
+function plugin_admissaoacessos_timeline_actions(array $params): void
+{
+    $item = $params['item'] ?? null;
+    if (!($item instanceof \Ticket) || !$item->getID()) {
+        return;
+    }
+
+    $config = \GlpiPlugin\Admissaoacessos\Config::getConfig();
+    $categoriasAdmissao = $config->categoriasIds();
+    if (empty($categoriasAdmissao) || !in_array((int) $item->fields['itilcategories_id'], $categoriasAdmissao, true)) {
+        return;
+    }
+
+    if (!$item->canAddItem('TicketTask')) {
+        return;
+    }
+
+    $rand = $params['rand'] ?? mt_rand();
+
+    echo "<li>";
+    echo "<button type='button' class='btn btn-outline-secondary admissaoacessos-abrir-modal' "
+        . "data-tickets-id='" . (int) $item->getID() . "' data-rand='" . (int) $rand . "'>";
+    echo "<i class='ti ti-user-plus' aria-hidden='true'></i> " . __('Adicionar tarefas de acesso', 'admissaoacessos');
+    echo "</button>";
+    echo "</li>";
+}
+
+/**
+ * Fecha o chamado -> dispara o e-mail de boas-vindas (Fase 5, ainda não
+ * implementada). Por enquanto só um stub seguro, pra não quebrar a
+ * ativação do plugin.
  */
 function plugin_admissaoacessos_item_update_ticket(\Ticket $item): void
 {

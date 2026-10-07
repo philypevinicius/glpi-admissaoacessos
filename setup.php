@@ -1,6 +1,6 @@
 <?php
 
-define('PLUGIN_ADMISSAOACESSOS_VERSION', '0.1.0');
+define('PLUGIN_ADMISSAOACESSOS_VERSION', '0.2.0');
 define('PLUGIN_ADMISSAOACESSOS_MIN_GLPI_VERSION', '11.0.0');
 define('PLUGIN_ADMISSAOACESSOS_MAX_GLPI_VERSION', '12.0.99');
 
@@ -32,10 +32,15 @@ function plugin_init_admissaoacessos()
 
     $PLUGIN_HOOKS['redefine_menus']['admissaoacessos'] = 'plugin_admissaoacessos_redefine_menus';
 
-    // Botão "Adicionar tarefas de acesso" no chamado: widget JS carregado em
-    // toda página autenticada, igual o padrão já usado no assistente/
-    // movimentacoes - ele mesmo decide (via ajax) se está numa tela de
-    // chamado de admissão antes de se desenhar.
+    // Botão "Adicionar tarefas de acesso" na timeline do chamado - hook
+    // nativo feito pra isso (em vez de JS caçando elemento no DOM depois
+    // do carregamento): o core injeta o HTML retornado direto dentro de
+    // <ul class="legacy-timeline-actions">, já no primeiro render.
+    $PLUGIN_HOOKS[\Glpi\Plugin\Hooks::TIMELINE_ACTIONS]['admissaoacessos'] = 'plugin_admissaoacessos_timeline_actions';
+
+    // JS/CSS do modal que o botão acima abre - carregados em toda página
+    // autenticada (mesmo padrão do assistente), mas só fazem algo quando
+    // encontram o botão no DOM.
     $PLUGIN_HOOKS['add_javascript']['admissaoacessos'] = 'public/js/admissaoacessos.js';
     $PLUGIN_HOOKS['add_css']['admissaoacessos'] = 'public/css/admissaoacessos.css';
 
